@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script>
+      window.backend = 'https://cantelope.ml/Darren/temp/website-accountsbackend/public';
+    </script>
+    <meta name="description" content="Kiwi Login Page">
+    <meta name="keywords" content="KiwiIRC, Kiwi, IRC, Login">
+    <title>Kiwi Login Page</title>
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Nothing+You+Could+Do" rel="stylesheet">
+    <link rel="styleheet" type="text/css" href="http://beta.kiwiirc.com/assets/css/main.css.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.5.16/vue.min.js"></script>
+    <style scoped>
+      body {
+        background: #ccc;
+        height: 100vh;
+      }
+      #login-container {
+        width: 360px;
+        margin-left: auto;
+        margin-right: auto;
+        font-family: 'Roboto';
+        margin-top:100px;
+      }
+      .login-container-inner {
+        position:relative;
+        border:1px solid #aaa;
+        background: #efefef;
+        padding: 20px;
+      }
+      nav.tabs {
+          position:absolute;
+          z-index:2;
+          display: block;
+          margin: 0 0 20px 0;
+          padding: 0;
+      }
+      nav.tabs > a {
+          display: inline-block;
+          float:left;
+          text-decoration: none;
+          height: 39px;
+          line-height: 42px;
+          border: solid 1px #ddd;
+          border-width: 1px 1px 0 0;
+          margin: 10px 0 0 0;
+          margin-top: -10px;
+          margin-bottom: 10px;
+          font-size: 24px;
+          background: #efefef;
+          text-align: center;
+          width: 179px;
+          transition: margin-top 0.5s, height 0.5s;
+      }
+      nav.tabs > a:hover {
+          margin-top: -20px !important;
+          height: 49px !important;
+      }
+      .selected {
+          background: #dff0d8 !important;
+          margin-top: -20px !important;
+          height: 49px !important;
+      }
+      @media screen and (max-width: 900px) {
+          nav.tabs {
+              margin-top: 40px;
+          }
+      }
+      .text {
+        font-size:18px;
+        margin-top: 20px;
+        width: 100%;
+        padding: 10px;
+      }
+      .submit {
+        margin-top: 20px;
+        margin-bottom: 20px;
+        font-size: 20px;
+        width: 100%;
+      }
+      .login-container-transition-enter,
+        .login-container-transition-leave-to {
+        opacity: 0;
+        transform: rotateY(50deg);
+      }
+      .login-container-transition-enter-to,
+        .login-container-transition-leave {
+        opacity: 1;
+        transform: rotateY(0deg);
+      }
+      .login-container-transition-enter-active,
+        .login-container-transition-leave-active {
+        transition: opacity 0.1s, transform 0.1s;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="login-container">
+      <template v-if="shared_data.token" :key="shared_data.token">
+        Welcome, {{shared_data.username}}
+        <button @click="logout()">Logout</button>
+      </template>
+      <template v-else>
+        <nav class="tabs">
+          <a href="#" @click="switchView('login')" :class="{selected: loginSelected, 'bg-success': loginSelected}">Login</a>
+          <a href="#" @click="switchView('register')" :class="{selected: registerSelected, 'bg-success': registerSelected}">Register</a>
+        </nav>
+        <transition name="login-container-transition" mode="out-in">
+          <div v-if="shared_data.view==='login'" key="1">
+            <login-comp :shared_data="shared_data"></login-comp>
+          </div>
+          <div v-else-if="shared_data.view==='resetPassword'" key="2">
+            <reset-comp :shared_data="shared_data"></reset-comp>
+          </div>
+          <div v-else key="3">
+            <register-comp :shared_data="shared_data"></register-comp>
+          </div>
+        </transition>
+      </template>
+    </div>
+    <script>
+
+      Vue.component('login-comp', {
+        props: ['shared_data'],
+        template:
+          '<div class="login-container-inner">' +
+          '  <form @submit.prevent="login()">' +
+          '    <input type="text" class="text" name="email" placeholder="Email Address" v-model="email" autofocus>' +
+          '    <input type="password" class="text" name="password" placeholder="Password" v-model="password">' +
+          '    <button type="submit" class="submit">Login</button>' +
+          '    <ul class="alert alert-danger" v-if="errors.length !== 0">' +
+          '      <li v-for="error in errors" key="error" style="margin-left:20px;line-height:2em;">{{error[0]}}</li>' +
+          '    </ul>' +
+          '    <div v-if="shared_data.registered" class="bg-success" style="padding:10px;">You\'ve registered!<br>You may sign in with the username and password you chose.</div>' +
+          '    Forgotten Password? <a href="#" @click="shared_data.view=\'resetPassword\'">Reset Password</a>' +
+          '  </form>' +
+          '</div>',
+        data: function () {
+          return {
+            email: '',
+            password: '',
+            errors: []
+          }
+        },
+        mounted: function () {
+          this.shared_data.token = this.getCookie('apitok')
+          this.isLoggedIn()
+        },
+        methods: {
+          isLoggedIn: function () {
+            if(!this.shared_data.token) return
+            var url = this.shared_data.backend + '/theme/isLoggedIn'
+            var self = this
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", url);
+            xhr.setRequestHeader("x-auth-token", self.shared_data.token);
+            xhr.onreadystatechange = function () {
+              if(xhr.readyState === 4 && xhr.status === 200) {
+                self.shared_data.username = xhr.responseText
+              }
+            };
+            xhr.send();
+          },
+          getCookie: function (cname) {
+            var name = cname + '='
+            var decodedCookie = decodeURIComponent(document.cookie)
+            var ca = decodedCookie.split(';')
+            for (let i = 0; i < ca.length; i++) {
+              var c = ca[i]
+              while (c.charAt(0) === ' ') {
+                c = c.substring(1)
+              }
+              if (c.indexOf(name) === 0) {
+                return c.substring(name.length, c.length)
+              }
+            }
+            return ''
+          },
+          login: function () {
+            var url = this.shared_data.backend + '/login'
+            var data = {email: this.email, password: this.password}
+            var self = this
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", url);
+            xhr.setRequestHeader("Content-Type", 'application/json');
+            xhr.onreadystatechange = function () {
+              if(xhr.readyState === 4 && xhr.status === 200) {
+                var res = JSON.parse(xhr.responseText)
+                if (res.token) {
+                  self.shared_data.token = res.token
+                  document.cookie = "apitok="+res.token+"; path=/";
+                  self.isLoggedIn()
+                } else {
+                  self.errors = res.errors
+                }
+              }
+            };
+            xhr.send(JSON.stringify(data));
+          }
+        }
+      })
+
+      Vue.component('register-comp', {
+        props: ['shared_data'],
+        data: function () {
+          return {
+            email: '',
+            emailConfirm: '',
+            password: '',
+            passwordConfirm: '',
+            errors: []
+          }
+        },
+        template:
+          '<div class="login-container-inner">' +
+          '  <form @submit.prevent="register()">' +
+          '    <input type="text" class="text" name="email" placeholder="Email Address" v-model="email">' +
+          '    <input type="text" class="text" name="confirmEmail" placeholder="Confirm Email Address" v-model="emailConfirm">' +
+          '    <input type="password" class="text" name="password" placeholder="Pasword" v-model="password">' +
+          '    <input type="password" class="text" name="confirmPassword" placeholder="Confirm Password" v-model="passwordConfirm">' +
+          '    <button type="submit" class="submit">Register</button>' +
+          '    <ul class="alert alert-danger" v-if="errors.length !== 0">' +
+          '      <li v-for="error in errors" key="error" style="margin-left:20px;line-height:2em;">{{error[0]}}</li>' +
+          '    </ul>' +
+          '    Already have an account? <a href="#" @click="shared_data.view=\'login\'">Login</a>' +
+          '  </form>' +
+          '</div>',
+        methods: {
+          register: function () {
+            var url = this.shared_data.backend + '/register'
+            var data = {
+              email: this.email,
+              email_confirm: this.emailConfirm,
+              password: this.password,
+              password_confirm: this.passwordConfirm,
+            }
+            var self = this
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", url);
+            xhr.setRequestHeader("Content-Type", 'application/json');
+            xhr.onreadystatechange = function () {
+              if(xhr.readyState === 4 && xhr.status === 200) {
+                var res = JSON.parse(xhr.responseText)
+                if(res.error === false) {
+                  self.shared_data.registered = true;
+                  self.shared_data.view = 'login';
+                } else {
+                  self.errors = res.errors;
+                }
+              }
+            };
+            xhr.send(JSON.stringify(data));
+          }
+        }
+      })
+
+      Vue.component('reset-comp', {
+        props: ['shared_data'],
+        data: function () {
+          return {
+            checkEmailMessage: false,
+            email: ''
+          }
+        },
+        template:
+          '<div class="login-container-inner">' +
+          '  <form @submit.prevent="resetPassword()">' +
+          '    <input type="text" class="text" name="email" placeholder="Email Address" v-model="email">' +
+          '    <button type="submit" class="submit">Reset Password</button>' +
+          '    <div class="alert alert-success" v-if="checkEmailMessage !== false">Please check your email.</div>' +
+          '    Oh wait, I remembered! <a href="#" @click="shared_data.view=\'login\'">Back to Login</a>' +
+          '  </form>' +
+          '</div>',
+        methods: {
+          resetPassword: function () {
+            var url = this.shared_data.backend + '/auth/reset_password'
+            this.checkEmailMessage = true;
+            var data = {
+              email: this.email,
+            }
+            var self = this
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", url);
+            xhr.setRequestHeader("Content-Type", 'application/json');
+            xhr.send(JSON.stringify(data));
+          }
+        }
+      })
+
+      new Vue({
+        el: '#login-container',
+        data: function () {
+          return {
+            shared_data: {
+              view: 'login',
+              username: '',
+              backend: window.backend,
+              registered: false,
+              token: ''
+            }
+          }
+        },
+        computed: {
+          loginSelected: function () {
+            return this.shared_data.view==='login' || this.shared_data.view==='resetPassword'
+          },
+          registerSelected: function () {
+            return this.shared_data.view==='register'
+          }
+        },
+        methods: {
+          switchView: function (view) {
+            this.shared_data.view = view;
+          },
+          logout: function () {
+            document.cookie = "apitok=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            this.shared_data.token = ''
+          }
+        }
+      })
+    </script>
+  </body>
+</html>
