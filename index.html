@@ -159,6 +159,7 @@
             xhr.onreadystatechange = function () {
               if(xhr.readyState === 4 && xhr.status === 200) {
                 self.shared_data.username = xhr.responseText
+                window.location = "/accounts";
               }
             };
             xhr.send();
